@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 5000;
 const SECURE_TOKEN = process.env.SECURE_TOKEN;
 
 // Middleware
-app.use(bodyParser.text({ type: "text/plain" }));
+app.use(bodyParser.text({ type: "text/plain", limit: "50mb" }));
 
 // Function to check token
 const checkToken = (req, res, next) => {
