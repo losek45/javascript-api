@@ -43,7 +43,8 @@ app.post("/execute", checkToken, (req, res) => {
 
 // POST /scrape endpoint for scraping with Puppeteer
 app.post("/scrape", checkToken, async (req, res) => {
-    const { code, timeout } = JSON.parse(req.body);
+    const code = req.body;
+    const timeout = parseInt(req.query.timeout) || 30000; // Get timeout from query parameter or default to 30 seconds
 
     if (!code) {
         return res.status(400).json({ error: "No code provided" });
@@ -54,7 +55,7 @@ app.post("/scrape", checkToken, async (req, res) => {
         const scrapeResult = await new Promise(async (resolve, reject) => {
             const timer = setTimeout(() => {
                 reject(new Error('Scraping operation timed out'));
-            }, timeout || 30000); // Default timeout is 30 seconds if not provided
+            }, timeout);
 
             try {
                 const result = await eval(code);
