@@ -20,6 +20,11 @@ const checkToken = (req, res, next) => {
     }
 };
 
+// Get Endpoint
+app.get("/", (req,res) => {
+    res.send("Uplifted Render Server Up and running")
+})
+
 // Execute endpoint
 app.post("/execute", checkToken, (req, res) => {
     const code = req.body;
