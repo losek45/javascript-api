@@ -1,8 +1,11 @@
+require('dotenv').config();
+
 const express = require("express");
 const bodyParser = require("body-parser");
+const puppeteer = require('puppeteer');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 4000;
 
 // Secure token from environment variable
 const SECURE_TOKEN = process.env.SECURE_TOKEN;
@@ -43,32 +46,52 @@ app.post("/execute", checkToken, (req, res) => {
 
 // POST /scrape endpoint for scraping with Puppeteer
 app.post("/scrape", checkToken, async (req, res) => {
-    const code = req.body;
-    const timeout = parseInt(req.query.timeout) || 30000; // Get timeout from query parameter or default to 30 seconds
+    let code = req.body;
+    const timeout = parseInt(req.query.timeout) || 30000;
+
+    console.log("Raw received code:", code);
+    console.log("Code type:", typeof code);
+    console.log("Code length:", code.length);
 
     if (!code) {
         return res.status(400).json({ error: "No code provided" });
     }
 
     try {
-        // Set up a timeout for the scraping operation
+        // If code is not a string, stringify it
+        if (typeof code !== 'string') {
+            code = JSON.stringify(code);
+        }
+
+        // Remove any leading/trailing whitespace
+        code = code.trim();
+
+        console.log("Processed code:", code);
+
         const scrapeResult = await new Promise(async (resolve, reject) => {
             const timer = setTimeout(() => {
                 reject(new Error('Scraping operation timed out'));
             }, timeout);
 
             try {
-                const result = await eval(code);
+                console.log("Attempting to evaluate code...");
+                const result = await eval(`(async () => { 
+                    ${code} 
+                })()`);
                 clearTimeout(timer);
                 resolve(result);
             } catch (error) {
+                console.error("Error during code evaluation:", error);
                 clearTimeout(timer);
                 reject(error);
             }
         });
 
+        console.log("Scrape result:", scrapeResult);
         res.json(scrapeResult);
     } catch (error) {
+        console.error("Error in /scrape endpoint:", error.message);
+        console.error("Error stack:", error.stack);
         res.status(500).json({ error: error.message, trace: error.stack });
     }
 });
