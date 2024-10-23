@@ -47,14 +47,14 @@ app.post("/execute", checkToken, (req, res) => {
 // POST /scrape endpoint for scraping with Puppeteer
 app.post("/scrape", checkToken, async (req, res) => {
     let code = req.body;
-    const timeout = parseInt(req.query.timeout) || 30000;
+    const timeout = parseInt(req.query.timeout) || 120000;
 
     console.log("Raw received code:", code);
     console.log("Code type:", typeof code);
     console.log("Code length:", code.length);
 
     if (!code) {
-        return res.status(400).json({ error: "No code provided" });
+        return res.status(400).json({ error: "No code: provided" });
     }
 
     try {
