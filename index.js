@@ -24,7 +24,7 @@ const checkToken = (req, res, next) => {
 };
 
 // Get Endpoint
-app.get("/", (req,res) => {
+app.get("/", (req, res) => {
     res.send("Uplifted Render Server Up and running");
 });
 
@@ -76,7 +76,6 @@ app.post("/scrape", checkToken, async (req, res) => {
 
             try {
                 console.log("Attempting to evaluate code...");
-                // Adjust timeout dynamically within the evaluated code, but leave the scraping logic as is
                 const result = await eval(`(async () => { 
                     ${code} 
                 })()`);
