@@ -25,8 +25,8 @@ const checkToken = (req, res, next) => {
 
 // Get Endpoint
 app.get("/", (req,res) => {
-    res.send("Uplifted Render Server Up and running")
-})
+    res.send("Uplifted Render Server Up and running");
+});
 
 // Execute endpoint
 app.post("/execute", checkToken, (req, res) => {
@@ -47,7 +47,8 @@ app.post("/execute", checkToken, (req, res) => {
 // POST /scrape endpoint for scraping with Puppeteer
 app.post("/scrape", checkToken, async (req, res) => {
     let code = req.body;
-    const timeout = parseInt(req.query.timeout) || 30000;
+    // Set a default timeout of 60 seconds, configurable via the query parameter
+    const timeout = parseInt(req.query.timeout) || 60000;
 
     console.log("Raw received code:", code);
     console.log("Code type:", typeof code);
@@ -75,6 +76,7 @@ app.post("/scrape", checkToken, async (req, res) => {
 
             try {
                 console.log("Attempting to evaluate code...");
+                // Adjust timeout dynamically within the evaluated code, but leave the scraping logic as is
                 const result = await eval(`(async () => { 
                     ${code} 
                 })()`);
