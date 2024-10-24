@@ -7,92 +7,71 @@ const puppeteer = require('puppeteer');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Secure token from environment variable
-const SECURE_TOKEN = process.env.SECURE_TOKEN;
-
 // Middleware
 app.use(bodyParser.text({ type: "text/plain", limit: "50mb" }));
 
-// Function to check token
-const checkToken = (req, res, next) => {
-    const token = req.headers.authorization;
-    if (token === SECURE_TOKEN) {
-        next();
-    } else {
-        res.status(401).json({ error: "Unauthorized" });
-    }
-};
-
-// Get Endpoint
-app.get("/", (req,res) => {
-    res.send("Uplifted Render Server Up and running")
-})
-
-// Execute endpoint
-app.post("/execute", checkToken, (req, res) => {
-    const code = req.body;
-    if (!code) {
-        return res.status(400).json({ error: "No code provided" });
-    }
-
-    try {
-        // Execute the code
-        const result = eval(code);
-        res.json({ result });
-    } catch (error) {
-        res.status(500).json({ error: error.message, trace: error.stack });
-    }
-});
+// Define the delay function here
+async function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // POST /scrape endpoint for scraping with Puppeteer
-app.post("/scrape", checkToken, async (req, res) => {
-    let code = req.body;
-    const timeout = parseInt(req.query.timeout) || 120000;
-
-    console.log("Raw received code:", code);
-    console.log("Code type:", typeof code);
-    console.log("Code length:", code.length);
-
-    if (!code) {
-        return res.status(400).json({ error: "No code: provided" });
-    }
-
+app.post("/scrape", async (req, res) => {
     try {
-        // If code is not a string, stringify it
-        if (typeof code !== 'string') {
-            code = JSON.stringify(code);
-        }
-
-        // Remove any leading/trailing whitespace
-        code = code.trim();
-
-        console.log("Processed code:", code);
-
-        const scrapeResult = await new Promise(async (resolve, reject) => {
-            const timer = setTimeout(() => {
-                reject(new Error('Scraping operation timed out'));
-            }, timeout);
+        // Puppeteer function to get the Bearer token (authorization header)
+        const getHeyReachAuthHeader = async (email, password) => {
+            const browser = await puppeteer.launch({ headless: true });
+            const page = await browser.newPage();
 
             try {
-                console.log("Attempting to evaluate code...");
-                const result = await eval(`(async () => { 
-                    ${code} 
-                })()`);
-                clearTimeout(timer);
-                resolve(result);
-            } catch (error) {
-                console.error("Error during code evaluation:", error);
-                clearTimeout(timer);
-                reject(error);
-            }
-        });
+                // Go to the login page with a timeout of 120000ms
+                await page.goto('https://app.heyreach.io/account/login', { timeout: 120000, waitUntil: 'domcontentloaded' });
 
-        console.log("Scrape result:", scrapeResult);
-        res.json(scrapeResult);
+                // Wait for the email input to be available and fill it in
+                await page.waitForSelector('#email', { timeout: 120000 });
+                await page.type('#email', email);
+
+                // Wait for the password input to be available and fill it in
+                await page.waitForSelector('input[type="password"]', { timeout: 120000 });
+                await page.type('input[type="password"]', password);
+                await delay(2000);  // Wait for 2 seconds
+
+                // Click the login button
+                await page.waitForSelector('button[heyreachbutton][buttontype="primary"]', { timeout: 120000 });
+                await page.click('button[heyreachbutton][buttontype="primary"]');
+
+                // Function to get the authorization header from the response
+                const authorizationHeader = await new Promise((resolve, reject) => {
+                    page.on('request', async (request) => {
+                        // Check if the request URL contains 'GetAll'
+                        if (request.url().includes('GetAll')) {
+                            const headers = request.headers();
+                            if (headers['authorization']) {
+                                resolve(headers['authorization']);
+                            }
+                        }
+                    });
+
+                    // Add a timeout to reject the promise if the header isn't found within 120 seconds
+                    setTimeout(() => {
+                        reject(new Error('Authorization header not found within the time limit.'));
+                    }, 120000); // 120 seconds timeout
+                });
+
+                return authorizationHeader;
+            } finally {
+                await browser.close(); // Close the browser
+            }
+        };
+
+        // Call the Puppeteer function to get the Bearer token
+        const authHeader = await getHeyReachAuthHeader('tarek.reda@gameball.co', 'g#hkn%$67834vhU^()^7648');
+
+        // Return the Bearer token in the response to Postman
+        res.json({ bearerToken: authHeader });
     } catch (error) {
-        console.error("Error in /scrape endpoint:", error.message);
-        console.error("Error stack:", error.stack);
-        res.status(500).json({ error: error.message, trace: error.stack });
+        // Return an error message if something goes wrong
+        res.status(500).json({ error: error.message });
     }
 });
 
