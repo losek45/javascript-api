@@ -47,7 +47,7 @@ app.post("/execute", checkToken, (req, res) => {
 // POST /scrape endpoint for scraping with Puppeteer
 app.post("/scrape", checkToken, async (req, res) => {
     let code = req.body;
-    const timeout = parseInt(req.query.timeout) || 180000; // --> Increased default timeout to 3 minutes
+    const timeout = parseInt(req.query.timeout) || 120000;
 
     console.log("Raw received code:", code);
     console.log("Code type:", typeof code);
@@ -64,60 +64,34 @@ app.post("/scrape", checkToken, async (req, res) => {
         code = code.trim();
         console.log("Processed code:", code);
 
-        // --> Simplified Promise structure and added better timing control
-        const scrapeResult = await new Promise(async (resolve, reject) => {
-            let completed = false;
-            
+        // --> Modified to properly wait for the result
+        const scrapeResult = await new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
-                if (!completed) {
-                    completed = true;
-                    reject(new Error('Scraping operation timed out'));
-                }
+                reject(new Error('Scraping operation timed out'));
             }, timeout);
 
-            try {
-                console.log("Starting scraping operation...");
-                
-                // --> Simplified evaluation structure
-                const result = await eval(`
-                    (async () => {
-                        ${code}
-                    })()
-                `);
-
-                if (!completed) {
-                    completed = true;
+            eval(`(async () => {
+                try {
+                    ${code}
+                    const result = await getHeyReachAuthHeader(email, password);
                     clearTimeout(timer);
                     resolve(result);
-                }
-            } catch (error) {
-                if (!completed) {
-                    completed = true;
+                } catch (error) {
                     clearTimeout(timer);
                     reject(error);
                 }
-            }
+            })();`);
         });
 
-        // --> Improved response handling
-        if (scrapeResult && typeof scrapeResult === 'string' && scrapeResult.includes('Bearer')) {
-            console.log("Valid bearer token obtained");
-            return res.json({ 
-                success: true,
-                result: scrapeResult,
-                timestamp: new Date().toISOString()
-            });
-        } else {
-            throw new Error('Invalid or missing bearer token in response');
-        }
+        console.log("Scrape result:", scrapeResult);
+        return res.json({ result: scrapeResult });
 
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
         console.error("Error stack:", error.stack);
         return res.status(500).json({ 
             error: error.message, 
-            trace: error.stack,
-            timestamp: new Date().toISOString()
+            trace: error.stack
         });
     }
 });
