@@ -79,34 +79,22 @@ app.post("/scrape", checkToken, async (req, res) => {
             }, timeout);
 
             try {
-                // --> Modified to handle any puppeteer script that logs an authorization header
+                // --> Modified to prevent puppeteer redeclaration
                 const result = await eval(`
                     (async () => {
                         let capturedToken = null;
+                        const originalConsoleLog = console.log;
                         
                         try {
-                            ${code}
-                            
-                            // Add a delay to ensure we capture the token
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                            
-                            // If the code includes console.log('Authorization Header:', ...), 
-                            // we'll capture that value
-                            const originalConsoleLog = console.log;
-                            console.log = (...args) => {
-                                originalConsoleLog.apply(console, args);
-                                if (args[0] === 'Authorization Header:' && args[1]) {
-                                    capturedToken = args[1];
-                                }
-                            };
-                            
-                            ${code}
+                            // Only execute the code once
+                            ${code.replace('const puppeteer = require(\'puppeteer\');', '// puppeteer already required')}
                             
                             // Restore original console.log
                             console.log = originalConsoleLog;
                             
                             return capturedToken;
                         } catch (error) {
+                            console.log = originalConsoleLog;
                             throw error;
                         }
                     })()
