@@ -57,6 +57,9 @@ app.post("/scrape", checkToken, async (req, res) => {
         return res.status(400).json({ error: "No code provided" });
     }
 
+    // To avoid sending an early response, we'll use a variable to store the result
+    let scrapeResult = null;
+
     try {
         // If code is not a string, stringify it
         if (typeof code !== 'string') {
@@ -90,17 +93,17 @@ app.post("/scrape", checkToken, async (req, res) => {
 
         console.log("Scrape result:", scrapeResult);
         
-        // --> Modified: Only sends response once scrapeResult completes, ensuring Postman waits
-        if (scrapeResult) {
-            res.json({ result: scrapeResult });
-        } else {
-            res.status(500).json({ error: "Failed to retrieve a valid response" });
-        }
-        
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
         console.error("Error stack:", error.stack);
-        res.status(500).json({ error: error.message, trace: error.stack });
+        return res.status(500).json({ error: error.message, trace: error.stack });
+    }
+
+    // --> Updated here: Ensures response is sent only after scrapeResult is obtained or after error handling
+    if (scrapeResult) {
+        res.json({ result: scrapeResult });
+    } else {
+        res.status(500).json({ error: "Failed to retrieve a valid response" });
     }
 });
 
