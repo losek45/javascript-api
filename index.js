@@ -58,43 +58,47 @@ app.post("/scrape", checkToken, async (req, res) => {
     }
 
     try {
+        // If code is not a string, stringify it
         if (typeof code !== 'string') {
             code = JSON.stringify(code);
         }
+
+        // Remove any leading/trailing whitespace
         code = code.trim();
+
         console.log("Processed code:", code);
 
-        // Remove the puppeteer require from the incoming code
-        code = code.replace(/const\s+puppeteer\s*=\s*require$['"]puppeteer['"]$;?/, '');
+        const scrapeResult = await new Promise(async (resolve, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error('Scraping operation timed out'));
+            }, timeout);
 
-        // Create the evaluation context with puppeteer already defined
-        const evalContext = `
-            const puppeteer = require('puppeteer');
-            ${code}
-            getHeyReachAuthHeader(email, password);
-        `;
-
-        const result = await eval(`(async () => { 
             try {
-                return await ${evalContext}
+                console.log("Attempting to evaluate code...");
+                // Ensure the provided code runs and retrieves the Bearer token or data needed
+                const result = await eval((async () => { 
+                    ${code} 
+                })());
+                clearTimeout(timer);
+                resolve(result);
             } catch (error) {
-                throw error;
+                console.error("Error during code evaluation:", error);
+                clearTimeout(timer);
+                reject(error);
             }
-        })()`);
+        });
 
-        console.log("Scrape result:", result);
-        return res.json({ result });
-
+        console.log("Scrape result:", scrapeResult);
+        
+        // --> This line was updated to send the response only after scrapeResult completes
+        res.json({ result: scrapeResult }); // <-- Change: ensures full waiting for scrapeResult
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
         console.error("Error stack:", error.stack);
-        return res.status(500).json({ 
-            error: error.message, 
-            trace: error.stack
-        });
+        res.status(500).json({ error: error.message, trace: error.stack });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(Server is running on port ${PORT});
 });
