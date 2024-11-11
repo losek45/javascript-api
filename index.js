@@ -52,25 +52,88 @@ async function runPuppeteerScrape(code, timeout) {
     });
 }
 
-// POST /scrape endpoint for executing arbitrary Puppeteer code
+// POST /scrape endpoint for scraping with Puppeteer
 app.post("/scrape", checkToken, async (req, res) => {
-    const code = req.body;
+    let code = req.body;
     const timeout = parseInt(req.query.timeout) || 120000;
+
+    console.log("Raw received code:", code);
+    console.log("Code type:", typeof code);
+    console.log("Code length:", code.length);
 
     if (!code) {
         return res.status(400).json({ error: "No code provided" });
     }
 
     try {
-        // Await the scraping function result
-        const scrapeResult = await runPuppeteerScrape(code, timeout);
+        if (typeof code !== 'string') {
+            code = JSON.stringify(code);
+        }
+        code = code.trim();
+        console.log("Processed code:", code);
 
-        // Send result to Postman after successful scraping
-        res.json({ result: scrapeResult });
+        // --> Modified to use a more robust Promise-based approach
+        const scrapeResult = await new Promise(async (resolve, reject) => {
+            let bearerToken = null;
+            const timer = setTimeout(() => {
+                reject(new Error('Scraping operation timed out'));
+            }, timeout);
+
+            try {
+                console.log("Starting scraping operation...");
+                
+                // --> Modified the evaluation to explicitly track the bearer token
+                const result = await eval(`
+                    (async () => {
+                        try {
+                            ${code}
+                            const token = await getHeyReachAuthHeader(email, password);
+                            if (!token) {
+                                throw new Error('Bearer token not obtained');
+                            }
+                            return token;
+                        } catch (error) {
+                            throw error;
+                        }
+                    })()
+                `);
+
+                bearerToken = result;
+                
+                if (!bearerToken) {
+                    throw new Error('Bearer token not found in response');
+                }
+
+                clearTimeout(timer);
+                console.log("Bearer token obtained successfully");
+                resolve(bearerToken);
+            } catch (error) {
+                clearTimeout(timer);
+                console.error("Error during scraping:", error);
+                reject(error);
+            }
+        });
+
+        // --> Added additional verification before sending response
+        if (!scrapeResult) {
+            throw new Error('No valid bearer token obtained');
+        }
+
+        console.log("Preparing to send response with bearer token");
+        return res.json({ 
+            success: true,
+            result: scrapeResult,
+            timestamp: new Date().toISOString()
+        });
 
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
-        res.status(500).json({ error: error.message, trace: error.stack });
+        console.error("Error stack:", error.stack);
+        return res.status(500).json({ 
+            error: error.message, 
+            trace: error.stack,
+            timestamp: new Date().toISOString()
+        });
     }
 });
 
