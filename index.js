@@ -47,7 +47,7 @@ app.post("/execute", checkToken, (req, res) => {
 // POST /scrape endpoint for scraping with Puppeteer
 app.post("/scrape", checkToken, async (req, res) => {
     let code = req.body;
-    const timeout = parseInt(req.query.timeout) || 120000;
+    const timeout = parseInt(req.query.timeout) || 180000; // --> Increased default timeout to 3 minutes
 
     console.log("Raw received code:", code);
     console.log("Code type:", typeof code);
@@ -64,59 +64,52 @@ app.post("/scrape", checkToken, async (req, res) => {
         code = code.trim();
         console.log("Processed code:", code);
 
-        // --> Modified to use a more robust Promise-based approach
+        // --> Simplified Promise structure and added better timing control
         const scrapeResult = await new Promise(async (resolve, reject) => {
-            let bearerToken = null;
+            let completed = false;
+            
             const timer = setTimeout(() => {
-                reject(new Error('Scraping operation timed out'));
+                if (!completed) {
+                    completed = true;
+                    reject(new Error('Scraping operation timed out'));
+                }
             }, timeout);
 
             try {
                 console.log("Starting scraping operation...");
                 
-                // --> Modified the evaluation to explicitly track the bearer token
+                // --> Simplified evaluation structure
                 const result = await eval(`
                     (async () => {
-                        try {
-                            ${code}
-                            const token = await getHeyReachAuthHeader(email, password);
-                            if (!token) {
-                                throw new Error('Bearer token not obtained');
-                            }
-                            return token;
-                        } catch (error) {
-                            throw error;
-                        }
+                        ${code}
                     })()
                 `);
 
-                bearerToken = result;
-                
-                if (!bearerToken) {
-                    throw new Error('Bearer token not found in response');
+                if (!completed) {
+                    completed = true;
+                    clearTimeout(timer);
+                    resolve(result);
                 }
-
-                clearTimeout(timer);
-                console.log("Bearer token obtained successfully");
-                resolve(bearerToken);
             } catch (error) {
-                clearTimeout(timer);
-                console.error("Error during scraping:", error);
-                reject(error);
+                if (!completed) {
+                    completed = true;
+                    clearTimeout(timer);
+                    reject(error);
+                }
             }
         });
 
-        // --> Added additional verification before sending response
-        if (!scrapeResult) {
-            throw new Error('No valid bearer token obtained');
+        // --> Improved response handling
+        if (scrapeResult && typeof scrapeResult === 'string' && scrapeResult.includes('Bearer')) {
+            console.log("Valid bearer token obtained");
+            return res.json({ 
+                success: true,
+                result: scrapeResult,
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            throw new Error('Invalid or missing bearer token in response');
         }
-
-        console.log("Preparing to send response with bearer token");
-        return res.json({ 
-            success: true,
-            result: scrapeResult,
-            timestamp: new Date().toISOString()
-        });
 
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
