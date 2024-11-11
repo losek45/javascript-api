@@ -64,18 +64,23 @@ app.post("/scrape", checkToken, async (req, res) => {
         code = code.trim();
         console.log("Processed code:", code);
 
-        // --> Modified to include puppeteer in the evaluation context
-        const result = await eval(`
-            (async () => {
-                const puppeteer = require('puppeteer');
-                try {
-                    ${code}
-                    return await getHeyReachAuthHeader(email, password);
-                } catch (error) {
-                    throw error;
-                }
-            })()
-        `);
+        // Remove the puppeteer require from the incoming code
+        code = code.replace(/const\s+puppeteer\s*=\s*require$['"]puppeteer['"]$;?/, '');
+
+        // Create the evaluation context with puppeteer already defined
+        const evalContext = `
+            const puppeteer = require('puppeteer');
+            ${code}
+            getHeyReachAuthHeader(email, password);
+        `;
+
+        const result = await eval(`(async () => { 
+            try {
+                return await ${evalContext}
+            } catch (error) {
+                throw error;
+            }
+        })()`);
 
         console.log("Scrape result:", result);
         return res.json({ result });
