@@ -23,34 +23,26 @@ const checkToken = (req, res, next) => {
     }
 };
 
-// Function to run the Puppeteer scraping code
-async function runPuppeteerScrape(code, timeout) {
-    return new Promise(async (resolve, reject) => {
-        const browser = await puppeteer.launch({ headless: true });
-        const page = await browser.newPage();
-        let scrapeResult;
+// Get Endpoint
+app.get("/", (req, res) => {
+    res.send("Uplifted Render Server Up and running");
+});
 
-        // Use a timer to enforce timeout
-        const timer = setTimeout(() => {
-            reject(new Error('Scraping operation timed out'));
-        }, timeout);
+// Execute endpoint
+app.post("/execute", checkToken, (req, res) => {
+    const code = req.body;
+    if (!code) {
+        return res.status(400).json({ error: "No code provided" });
+    }
 
-        try {
-            // Execute the code provided directly in Puppeteer context
-            scrapeResult = await eval(`(async () => { ${code} })()`);
-
-            clearTimeout(timer); // Clear timeout if we succeeded
-            resolve(scrapeResult); // Resolve with the result
-
-        } catch (error) {
-            clearTimeout(timer);
-            reject(error); // Reject on error
-
-        } finally {
-            await browser.close(); // Ensure browser is closed
-        }
-    });
-}
+    try {
+        // Execute the code
+        const result = eval(code);
+        res.json({ result });
+    } catch (error) {
+        res.status(500).json({ error: error.message, trace: error.stack });
+    }
+});
 
 // POST /scrape endpoint for scraping with Puppeteer
 app.post("/scrape", checkToken, async (req, res) => {
