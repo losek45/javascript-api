@@ -28,82 +28,49 @@ app.get("/", (req, res) => {
     res.send("Uplifted Render Server Up and running");
 });
 
-// Execute endpoint
-app.post("/execute", checkToken, (req, res) => {
-    const code = req.body;
-    if (!code) {
-        return res.status(400).json({ error: "No code provided" });
-    }
-
-    try {
-        // Execute the code
-        const result = eval(code);
-        res.json({ result });
-    } catch (error) {
-        res.status(500).json({ error: error.message, trace: error.stack });
-    }
-});
-
-// POST /scrape endpoint for scraping with Puppeteer
+// POST /scrape endpoint for executing arbitrary Puppeteer code
 app.post("/scrape", checkToken, async (req, res) => {
     let code = req.body;
     const timeout = parseInt(req.query.timeout) || 120000;
 
-    console.log("Raw received code:", code);
-    console.log("Code type:", typeof code);
-    console.log("Code length:", code.length);
-
     if (!code) {
         return res.status(400).json({ error: "No code provided" });
     }
 
-    // To avoid sending an early response, we'll use a variable to store the result
-    let scrapeResult = null;
+    // Ensure code is a string and trim whitespace
+    if (typeof code !== 'string') {
+        code = JSON.stringify(code);
+    }
+    code = code.trim();
 
     try {
-        // If code is not a string, stringify it
-        if (typeof code !== 'string') {
-            code = JSON.stringify(code);
-        }
-
-        // Remove any leading/trailing whitespace
-        code = code.trim();
-
-        console.log("Processed code:", code);
-
+        // Promise to run the provided Puppeteer code with a timeout
         const scrapeResult = await new Promise(async (resolve, reject) => {
             const timer = setTimeout(() => {
                 reject(new Error('Scraping operation timed out'));
             }, timeout);
 
             try {
-                console.log("Attempting to evaluate code...");
-                // Ensure the provided code runs and retrieves the Bearer token or data needed
+                // Evaluate the provided code asynchronously with Puppeteer context
                 const result = await eval(`(async () => { 
                     ${code} 
                 })()`);
+
                 clearTimeout(timer);
-                resolve(result);
+                resolve(result);  // Only resolve after Puppeteer completes
             } catch (error) {
-                console.error("Error during code evaluation:", error);
                 clearTimeout(timer);
-                reject(error);
+                reject(error);  // Handle evaluation errors
             }
         });
 
-        console.log("Scrape result:", scrapeResult);
-        
-    } catch (error) {
-        console.error("Error in /scrape endpoint:", error.message);
-        console.error("Error stack:", error.stack);
-        return res.status(500).json({ error: error.message, trace: error.stack });
-    }
-
-    // --> Updated here: Ensures response is sent only after scrapeResult is obtained or after error handling
-    if (scrapeResult) {
+        // Send result to Postman after successful scraping
         res.json({ result: scrapeResult });
-    } else {
-        res.status(500).json({ error: "Failed to retrieve a valid response" });
+
+    } catch (error) {
+        // Error handling for any issues during scraping
+        console.error("Error in /scrape endpoint:", error.message);
+        res.status(500).json({ error: error.message, trace: error.stack });
     }
 });
 
