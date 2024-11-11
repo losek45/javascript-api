@@ -64,9 +64,10 @@ app.post("/scrape", checkToken, async (req, res) => {
         code = code.trim();
         console.log("Processed code:", code);
 
-        // --> Modified to directly execute and wait for the result
+        // --> Modified to include puppeteer in the evaluation context
         const result = await eval(`
             (async () => {
+                const puppeteer = require('puppeteer');
                 try {
                     ${code}
                     return await getHeyReachAuthHeader(email, password);
