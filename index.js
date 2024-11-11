@@ -73,58 +73,36 @@ app.post("/scrape", checkToken, async (req, res) => {
         code = code.trim();
         console.log("Processed code:", code);
 
-        // --> Added a response promise wrapper
-        await new Promise(async (outerResolve, outerReject) => {
-            const scrapeResult = await new Promise(async (resolve, reject) => {
-                const timer = setTimeout(() => {
-                    reject(new Error('Scraping operation timed out'));
-                }, timeout);
+        // --> Modified to use a single promise with proper timeout
+        const scrapeResult = await new Promise(async (resolve, reject) => {
+            let timeoutId = setTimeout(() => {
+                reject(new Error('Scraping operation timed out'));
+            }, timeout);
 
-                try {
-                    const result = await eval(`(async () => {
-                        ${code}
-                        const token = await getHeyReachAuthHeader(email, password);
-                        if (!token) {
-                            throw new Error('No bearer token found');
-                        }
-                        return token;
-                    })()`);
-                    
-                    // --> Added validation and delay
-                    if (result && typeof result === 'string' && result.includes('Bearer')) {
-                        console.log("Bearer token found:", result);
-                        clearTimeout(timer);
-                        resolve(result);
-                    } else {
-                        // Wait additional time if token not found immediately
-                        setTimeout(async () => {
-                            const retryResult = await eval(`(async () => {
-                                return await getHeyReachAuthHeader(email, password);
-                            })()`);
-                            if (retryResult) {
-                                resolve(retryResult);
-                            } else {
-                                reject(new Error('Failed to obtain bearer token'));
-                            }
-                        }, 30000); // 30 second additional wait
-                    }
-                } catch (error) {
-                    console.error("Error during code evaluation:", error);
-                    clearTimeout(timer);
-                    reject(error);
+            try {
+                const result = await eval(`(async () => {
+                    ${code}
+                    const token = await getHeyReachAuthHeader(email, password);
+                    return token;
+                })()`);
+
+                clearTimeout(timeoutId);
+                
+                // --> Added simple validation
+                if (result && typeof result === 'string') {
+                    console.log("Token obtained successfully");
+                    resolve(result);
+                } else {
+                    reject(new Error('Invalid token received'));
                 }
-            });
-
-            console.log("Scrape result:", scrapeResult);
-            
-            // --> Only resolve outer promise when we have a valid token
-            if (scrapeResult && typeof scrapeResult === 'string') {
-                res.json({ result: scrapeResult });
-                outerResolve();
-            } else {
-                outerReject(new Error('Invalid token format received'));
+            } catch (error) {
+                clearTimeout(timeoutId);
+                reject(error);
             }
         });
+
+        console.log("Scrape result:", scrapeResult);
+        res.json({ result: scrapeResult });
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
         console.error("Error stack:", error.stack);
