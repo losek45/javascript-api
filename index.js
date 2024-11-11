@@ -73,27 +73,52 @@ app.post("/scrape", checkToken, async (req, res) => {
         code = code.trim();
         console.log("Processed code:", code);
 
-        // --> Modified to use a single promise with proper timeout
         const scrapeResult = await new Promise(async (resolve, reject) => {
             let timeoutId = setTimeout(() => {
                 reject(new Error('Scraping operation timed out'));
             }, timeout);
 
             try {
-                const result = await eval(`(async () => {
-                    ${code}
-                    const token = await getHeyReachAuthHeader(email, password);
-                    return token;
-                })()`);
+                // --> Modified to handle any puppeteer script that logs an authorization header
+                const result = await eval(`
+                    (async () => {
+                        let capturedToken = null;
+                        
+                        try {
+                            ${code}
+                            
+                            // Add a delay to ensure we capture the token
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                            
+                            // If the code includes console.log('Authorization Header:', ...), 
+                            // we'll capture that value
+                            const originalConsoleLog = console.log;
+                            console.log = (...args) => {
+                                originalConsoleLog.apply(console, args);
+                                if (args[0] === 'Authorization Header:' && args[1]) {
+                                    capturedToken = args[1];
+                                }
+                            };
+                            
+                            ${code}
+                            
+                            // Restore original console.log
+                            console.log = originalConsoleLog;
+                            
+                            return capturedToken;
+                        } catch (error) {
+                            throw error;
+                        }
+                    })()
+                `);
 
                 clearTimeout(timeoutId);
                 
-                // --> Added simple validation
-                if (result && typeof result === 'string') {
-                    console.log("Token obtained successfully");
+                if (result && typeof result === 'string' && (result.includes('Bearer') || result.includes('bearer'))) {
+                    console.log("Bearer token obtained:", result);
                     resolve(result);
                 } else {
-                    reject(new Error('Invalid token received'));
+                    reject(new Error('Invalid or missing bearer token'));
                 }
             } catch (error) {
                 clearTimeout(timeoutId);
@@ -101,8 +126,12 @@ app.post("/scrape", checkToken, async (req, res) => {
             }
         });
 
-        console.log("Scrape result:", scrapeResult);
-        res.json({ result: scrapeResult });
+        if (scrapeResult) {
+            console.log("Sending successful response with token");
+            res.json({ result: scrapeResult });
+        } else {
+            throw new Error('No valid result obtained');
+        }
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
         console.error("Error stack:", error.stack);
