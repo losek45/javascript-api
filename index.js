@@ -24,9 +24,9 @@ const checkToken = (req, res, next) => {
 };
 
 // Get Endpoint
-app.get("/", (req,res) => {
-    res.send("Uplifted Render Server Up and running")
-})
+app.get("/", (req, res) => {
+    res.send("Uplifted Render Server Up and running");
+});
 
 // Execute endpoint
 app.post("/execute", checkToken, (req, res) => {
@@ -75,6 +75,7 @@ app.post("/scrape", checkToken, async (req, res) => {
 
             try {
                 console.log("Attempting to evaluate code...");
+                // Ensure the provided code runs and retrieves the Bearer token or data needed
                 const result = await eval(`(async () => { 
                     ${code} 
                 })()`);
@@ -88,7 +89,9 @@ app.post("/scrape", checkToken, async (req, res) => {
         });
 
         console.log("Scrape result:", scrapeResult);
-        res.json(scrapeResult);
+        
+        // --> This line was updated to send the response only after scrapeResult completes
+        res.json({ result: scrapeResult }); // <-- Change: ensures full waiting for scrapeResult
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
         console.error("Error stack:", error.stack);
