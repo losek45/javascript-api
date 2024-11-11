@@ -64,35 +64,20 @@ app.post("/scrape", checkToken, async (req, res) => {
         code = code.trim();
         console.log("Processed code:", code);
 
-        // --> Modified to include Puppeteer launch args
-        const modifiedCode = `
-            const browser = await puppeteer.launch({ 
-                headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
-            ${code}
-        `;
-
-        const scrapeResult = await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                reject(new Error('Scraping operation timed out'));
-            }, timeout);
-
-            eval(`(async () => {
+        // --> Modified to directly execute and wait for the result
+        const result = await eval(`
+            (async () => {
                 try {
-                    ${modifiedCode}
-                    const result = await getHeyReachAuthHeader(email, password);
-                    clearTimeout(timer);
-                    resolve(result);
+                    ${code}
+                    return await getHeyReachAuthHeader(email, password);
                 } catch (error) {
-                    clearTimeout(timer);
-                    reject(error);
+                    throw error;
                 }
-            })();`);
-        });
+            })()
+        `);
 
-        console.log("Scrape result:", scrapeResult);
-        return res.json({ result: scrapeResult });
+        console.log("Scrape result:", result);
+        return res.json({ result });
 
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
