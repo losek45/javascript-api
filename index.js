@@ -64,7 +64,15 @@ app.post("/scrape", checkToken, async (req, res) => {
         code = code.trim();
         console.log("Processed code:", code);
 
-        // --> Modified to properly wait for the result
+        // --> Modified to include Puppeteer launch args
+        const modifiedCode = `
+            const browser = await puppeteer.launch({ 
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+            ${code}
+        `;
+
         const scrapeResult = await new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 reject(new Error('Scraping operation timed out'));
@@ -72,7 +80,7 @@ app.post("/scrape", checkToken, async (req, res) => {
 
             eval(`(async () => {
                 try {
-                    ${code}
+                    ${modifiedCode}
                     const result = await getHeyReachAuthHeader(email, password);
                     clearTimeout(timer);
                     resolve(result);
