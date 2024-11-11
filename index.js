@@ -90,8 +90,13 @@ app.post("/scrape", checkToken, async (req, res) => {
 
         console.log("Scrape result:", scrapeResult);
         
-        // --> This line was updated to send the response only after scrapeResult completes
-        res.json({ result: scrapeResult }); // <-- Change: ensures full waiting for scrapeResult
+        // --> Modified: Only sends response once scrapeResult completes, ensuring Postman waits
+        if (scrapeResult) {
+            res.json({ result: scrapeResult });
+        } else {
+            res.status(500).json({ error: "Failed to retrieve a valid response" });
+        }
+        
     } catch (error) {
         console.error("Error in /scrape endpoint:", error.message);
         console.error("Error stack:", error.stack);
