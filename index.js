@@ -23,6 +23,27 @@ const checkToken = (req, res, next) => {
     }
 };
 
+// Get Endpoint
+app.get("/", (req,res) => {
+    res.send("Uplifted Render Server Up and running")
+})
+
+// Execute endpoint
+app.post("/execute", checkToken, (req, res) => {
+    const code = req.body;
+    if (!code) {
+        return res.status(400).json({ error: "No code provided" });
+    }
+
+    try {
+        // Execute the code
+        const result = eval(code);
+        res.json({ result });
+    } catch (error) {
+        res.status(500).json({ error: error.message, trace: error.stack });
+    }
+});
+
 // Function to run the Puppeteer scraping code
 async function runPuppeteerScrape(code, timeout) {
     return new Promise(async (resolve, reject) => {
