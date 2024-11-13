@@ -29,24 +29,23 @@ app.get("/", (req,res) => {
 })
 
 // Execute endpoint
-app.post("/execute", checkToken, async (req, res) => {  // Made this async
+app.post("/execute", checkToken, async (req, res) => {
     const code = req.body;
     if (!code) {
         return res.status(400).json({ error: "No code provided" });
     }
 
     try {
-        // Create a function from the code
-        const asyncFunction = new Function(`
+        // Create a function with puppeteer in its scope
+        const asyncFunction = new Function('puppeteer', `
             return (async () => {
                 ${code}
             })();
         `);
 
-        // Execute and await the result
-        const result = await asyncFunction();
+        // Execute and await the result, passing puppeteer as an argument
+        const result = await asyncFunction(puppeteer);
         
-        // Send the result
         res.json({ result });
     } catch (error) {
         res.status(500).json({ error: error.message, trace: error.stack });
