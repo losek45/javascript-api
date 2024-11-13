@@ -37,7 +37,7 @@ app.post("/execute", checkToken, async (req, res) => {
 
     try {
         // Create a function with browser tools in its scope
-        const asyncFunction = new Function('browser', `
+        const asyncFunction = new Function('browse', `
             return (async () => {
                 ${code}
             })();
