@@ -36,8 +36,8 @@ app.post("/execute", checkToken, async (req, res) => {
     }
 
     try {
-        // Create a function with puppeteer in its scope
-        const asyncFunction = new Function('puppeteer', `
+        // Create a function with browser tools in its scope
+        const asyncFunction = new Function('browser', `
             return (async () => {
                 ${code}
             })();
