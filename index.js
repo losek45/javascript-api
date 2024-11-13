@@ -29,54 +29,15 @@ app.get("/", (req,res) => {
 })
 
 // Execute endpoint
-app.post("/execute", checkToken, async (req, res) => {
+app.post("/execute", checkToken, (req, res) => {
     const code = req.body;
     if (!code) {
         return res.status(400).json({ error: "No code provided" });
     }
 
     try {
-        // Create a safe context for execution with necessary dependencies
-        const context = {
-            puppeteer: puppeteer,
-            browser: null,
-            console: console,
-            setTimeout: setTimeout,
-            Promise: Promise
-        };
-
-        // Launch browser with required arguments for cloud environment
-        context.browser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--disable-gpu',
-                '--window-size=1920x1080',
-            ]
-        });
-
-        // Wrap the code in an async function
-        const wrappedCode = `
-            (async () => {
-                try {
-                    ${code}
-                } finally {
-                    if (browser) {
-                        await browser.close();
-                    }
-                }
-            })()
-        `;
-
-        // Execute the code in the context
-        const result = await eval(`(async () => {
-            const { puppeteer, browser, console, setTimeout, Promise } = context;
-            ${wrappedCode}
-        })()`);
-
+        // Execute the code
+        const result = eval(code);
         res.json({ result });
     } catch (error) {
         res.status(500).json({ error: error.message, trace: error.stack });
