@@ -29,24 +29,25 @@ app.get("/", (req,res) => {
 })
 
 // Execute endpoint
-app.post("/execute", checkToken, (req, res) => {
+app.post("/execute", checkToken, async (req, res) => {  // Made this async
     const code = req.body;
     if (!code) {
         return res.status(400).json({ error: "No code provided" });
     }
 
     try {
-        // Wrap the code in an async IIFE (Immediately Invoked Function Expression)
-        const wrappedCode = `
-            (async () => {
+        // Create a function from the code
+        const asyncFunction = new Function(`
+            return (async () => {
                 ${code}
-            })()
-        `;
+            })();
+        `);
+
+        // Execute and await the result
+        const result = await asyncFunction();
         
-        // Execute the wrapped code and handle the promise
-        eval(wrappedCode)
-            .then(result => res.json({ result }))
-            .catch(error => res.status(500).json({ error: error.message, trace: error.stack }));
+        // Send the result
+        res.json({ result });
     } catch (error) {
         res.status(500).json({ error: error.message, trace: error.stack });
     }
