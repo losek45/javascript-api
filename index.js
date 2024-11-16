@@ -52,25 +52,37 @@ app.post("/execute", checkToken, async (req, res) => {
 
     const page = await browser.newPage();
 
+    // Capture console logs from the page
+    let consoleLogs = [];
+    page.on('console', msg => {
+        for (let i = 0; i < msg.args().length; ++i)
+            consoleLogs.push(`${msg.args()[i]}`);
+    });
+
     try {
-        // Create a function with 'page' in its scope
-        const asyncFunction = new Function('page', `
+        // Create a function with 'page' and other utilities in its scope
+        const asyncFunction = new Function('page', 'browser', 'require', `
             return (async () => {
-                ${code}
+                try {
+                    ${code}
+                } catch (error) {
+                    console.error('Error in user script:', error);
+                    throw error;
+                }
             })();
         `);
 
         // Execute and await the result, passing the page as an argument, with timeout
-        const result = await withTimeout(asyncFunction(page), 120000); // 120 seconds
+        const result = await withTimeout(asyncFunction(page, browser, require), 30000); // 30 seconds
 
         // Close the browser
         await browser.close();
 
-        res.json({ result });
+        res.json({ result, consoleLogs });
     } catch (error) {
         // Close the browser in case of error
         await browser.close();
-        res.status(500).json({ error: error.message, trace: error.stack });
+        res.status(500).json({ error: error.message, trace: error.stack, consoleLogs });
     }
 });
 
