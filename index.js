@@ -60,8 +60,13 @@ app.post("/execute", checkToken, async (req, res) => {
     });
 
     try {
+<<<<<<< HEAD
         // Create a function with 'page' and other utilities in its scope
         const asyncFunction = new Function('page', 'browser', 'require', `
+=======
+        // Create a function with browser tools in its scope
+        const asyncFunction = new Function('browser', `
+>>>>>>> parent of c0c9ad1 (Reset Source to Original Execute Function 6)
             return (async () => {
                 try {
                     ${code}
