@@ -1,16 +1,13 @@
 require('dotenv').config();
-
 const express = require("express");
 const bodyParser = require("body-parser");
 const puppeteer = require('puppeteer');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-
-// Secure token from environment variable
 const SECURE_TOKEN = process.env.SECURE_TOKEN;
 
-// Middleware
+// Middleware to parse text and set body size limits
 app.use(bodyParser.text({ type: "text/plain", limit: "50mb" }));
 
 // Middleware to check token
@@ -23,12 +20,12 @@ const checkToken = (req, res, next) => {
     }
 };
 
-// Get Endpoint
+// Route: Basic health check
 app.get("/", (req, res) => {
-    res.send("Uplifted Render Server Up and running");
+    res.send("Uplifted Render Server is up and running!");
 });
 
-// Execute endpoint
+// Route: Execute JavaScript with Puppeteer
 app.post("/execute", checkToken, async (req, res) => {
     const code = req.body;
 
@@ -44,20 +41,14 @@ app.post("/execute", checkToken, async (req, res) => {
         }, 30000); // Timeout set to 30 seconds
 
         // Create a function to run the provided code
-        const asyncFunction = new Function('browse', `
+        const asyncFunction = new Function('puppeteer', `
             return (async () => {
                 ${code}
             })();
         `);
 
-        // Launch Puppeteer browser
-        browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-
-        // Run the provided code with Puppeteer browser instance
-        const result = await asyncFunction(browser);
+        // Execute the provided code with Puppeteer module as an argument
+        const result = await asyncFunction(puppeteer);
 
         clearTimeout(timeout);
         res.json({ result });
