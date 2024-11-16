@@ -61,7 +61,7 @@ app.post("/execute", checkToken, async (req, res) => {
         `);
 
         // Execute and await the result, passing the page as an argument, with timeout
-        const result = await withTimeout(asyncFunction(page), 10000); // 10 seconds
+        const result = await withTimeout(asyncFunction(page), 120000); // 120 seconds
 
         // Close the browser
         await browser.close();
