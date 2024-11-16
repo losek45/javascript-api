@@ -17,7 +17,6 @@
         "express": "^4.19.2",
         "luxon": "^3.5.0",
         "puppeteer": "^23.1.1",
-        "playwright": "^1.30.0",
         "youtube-transcript": "^1.2.1"
     }
 }
