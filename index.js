@@ -13,7 +13,7 @@ const SECURE_TOKEN = process.env.SECURE_TOKEN;
 // Middleware
 app.use(bodyParser.text({ type: "text/plain", limit: "50mb" }));
 
-// Function to check token
+// Middleware to check token
 const checkToken = (req, res, next) => {
     const token = req.headers.authorization;
     if (token === SECURE_TOKEN) {
@@ -36,51 +36,52 @@ app.post("/execute", checkToken, async (req, res) => {
         return res.status(400).json({ error: "No code provided" });
     }
 
-    let browser = null;
-
+    let browser;
     try {
-        // Create a new browser instance with robust settings
+        // Limit maximum execution time for requests
+        const timeout = setTimeout(() => {
+            throw new Error("Execution timed out");
+        }, 30000); // Timeout set to 30 seconds
+
+        // Create a function to run the provided code
+        const asyncFunction = new Function('browse', `
+            return (async () => {
+                ${code}
+            })();
+        `);
+
+        // Launch Puppeteer browser
         browser = await puppeteer.launch({
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            timeout: 30000, // Timeout for browser launch
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
 
-        // Define a limited execution time for the user code
-        const executeWithTimeout = (fn, timeout) =>
-            Promise.race([
-                fn(),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("Execution timed out")), timeout)
-                ),
-            ]);
+        // Run the provided code with Puppeteer browser instance
+        const result = await asyncFunction(browser);
 
-        // Wrap the user's code execution
-        const result = await executeWithTimeout(async () => {
-            const asyncFunction = new Function('browser', `
-                return (async () => {
-                    ${code}
-                })();
-            `);
-            return await asyncFunction(browser); // Execute the code
-        }, 60000); // Set user code timeout (e.g., 60 seconds)
-
+        clearTimeout(timeout);
         res.json({ result });
     } catch (error) {
-        // Detailed error response
-        res.status(500).json({
-            error: error.message,
-            trace: error.stack,
-            tip: "Check your script or reduce its complexity.",
-        });
+        res.status(500).json({ error: error.message, trace: error.stack });
     } finally {
-        // Ensure the browser instance is properly closed
         if (browser) {
-            await browser.close();
+            await browser.close(); // Ensure browser is closed in all cases
         }
     }
 });
 
+// Error handling middleware for unknown routes
+app.use((req, res) => {
+    res.status(404).json({ error: "Endpoint not found" });
+});
+
+// Error handling middleware for unexpected errors
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: "Internal server error" });
+});
+
+// Start server
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
