@@ -24,31 +24,60 @@ const checkToken = (req, res, next) => {
 };
 
 // Get Endpoint
-app.get("/", (req,res) => {
-    res.send("Uplifted Render Server Up and running")
-})
+app.get("/", (req, res) => {
+    res.send("Uplifted Render Server Up and running");
+});
 
 // Execute endpoint
 app.post("/execute", checkToken, async (req, res) => {
     const code = req.body;
+
     if (!code) {
         return res.status(400).json({ error: "No code provided" });
     }
 
-    try {
-        // Create a function with browser tools in its scope
-        const asyncFunction = new Function('browse', `
-            return (async () => {
-                ${code}
-            })();
-        `);
+    let browser = null;
 
-        // Execute and await the result, passing puppeteer as an argument
-        const result = await asyncFunction(puppeteer);
-        
+    try {
+        // Create a new browser instance with robust settings
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            timeout: 30000, // Timeout for browser launch
+        });
+
+        // Define a limited execution time for the user code
+        const executeWithTimeout = (fn, timeout) =>
+            Promise.race([
+                fn(),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Execution timed out")), timeout)
+                ),
+            ]);
+
+        // Wrap the user's code execution
+        const result = await executeWithTimeout(async () => {
+            const asyncFunction = new Function('browser', `
+                return (async () => {
+                    ${code}
+                })();
+            `);
+            return await asyncFunction(browser); // Execute the code
+        }, 60000); // Set user code timeout (e.g., 60 seconds)
+
         res.json({ result });
     } catch (error) {
-        res.status(500).json({ error: error.message, trace: error.stack });
+        // Detailed error response
+        res.status(500).json({
+            error: error.message,
+            trace: error.stack,
+            tip: "Check your script or reduce its complexity.",
+        });
+    } finally {
+        // Ensure the browser instance is properly closed
+        if (browser) {
+            await browser.close();
+        }
     }
 });
 
