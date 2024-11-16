@@ -24,9 +24,9 @@ const checkToken = (req, res, next) => {
 };
 
 // Get Endpoint
-app.get("/", (req,res) => {
-    res.send("Uplifted Render Server Up and running")
-})
+app.get("/", (req, res) => {
+    res.send("Uplifted Render Server Up and running");
+});
 
 // Execute endpoint
 app.post("/execute", checkToken, async (req, res) => {
@@ -35,19 +35,41 @@ app.post("/execute", checkToken, async (req, res) => {
         return res.status(400).json({ error: "No code provided" });
     }
 
+    let browser;
     try {
-        // Create a function with browser tools in its scope
-        const asyncFunction = new Function('browse', `
+        // Launch browser with timeout and resource constraints
+        browser = await puppeteer.launch({ 
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            timeout: 60000 // 60 seconds timeout for launching the browser
+        });
+
+        // Open new page
+        const page = await browser.newPage();
+
+        // Set default timeouts for navigation and waiting
+        const TIMEOUT = 60000; // 60 seconds
+        page.setDefaultNavigationTimeout(TIMEOUT);
+        page.setDefaultTimeout(TIMEOUT);
+
+        // Create a function with puppeteer, browser, page, and console in its scope
+        const asyncFunction = new Function('puppeteer', 'browser', 'page', 'console', `
             return (async () => {
                 ${code}
             })();
         `);
 
-        // Execute and await the result, passing puppeteer as an argument
-        const result = await asyncFunction(puppeteer);
+        // Execute and await the result
+        const result = await asyncFunction(puppeteer, browser, page, console);
         
+        // Close browser
+        await browser.close();
+
+        // Return the result
         res.json({ result });
     } catch (error) {
+        // Ensure browser is closed in case of an error
+        if (browser) await browser.close();
         res.status(500).json({ error: error.message, trace: error.stack });
     }
 });
