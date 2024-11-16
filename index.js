@@ -23,20 +23,10 @@ const checkToken = (req, res, next) => {
     }
 };
 
-// Timeout function
-function withTimeout(promise, ms) {
-    let timeout = new Promise((resolve, reject) => {
-        setTimeout(() => {
-            reject(new Error('Timed out after ' + ms + ' ms'));
-        }, ms);
-    });
-    return Promise.race([promise, timeout]);
-}
-
 // Get Endpoint
-app.get("/", (req, res) => {
-    res.send("Server Up and running");
-});
+app.get("/", (req,res) => {
+    res.send("Uplifted Render Server Up and running")
+})
 
 // Execute endpoint
 app.post("/execute", checkToken, async (req, res) => {
@@ -45,49 +35,20 @@ app.post("/execute", checkToken, async (req, res) => {
         return res.status(400).json({ error: "No code provided" });
     }
 
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    const page = await browser.newPage();
-
-    // Capture console logs from the page
-    let consoleLogs = [];
-    page.on('console', msg => {
-        for (let i = 0; i < msg.args().length; ++i)
-            consoleLogs.push(`${msg.args()[i]}`);
-    });
-
     try {
-<<<<<<< HEAD
-        // Create a function with 'page' and other utilities in its scope
-        const asyncFunction = new Function('page', 'browser', 'require', `
-=======
         // Create a function with browser tools in its scope
-        const asyncFunction = new Function('browser', `
->>>>>>> parent of c0c9ad1 (Reset Source to Original Execute Function 6)
+        const asyncFunction = new Function('browse', `
             return (async () => {
-                try {
-                    ${code}
-                } catch (error) {
-                    console.error('Error in user script:', error);
-                    throw error;
-                }
+                ${code}
             })();
         `);
 
-        // Execute and await the result, passing the page as an argument, with timeout
-        const result = await withTimeout(asyncFunction(page, browser, require), 30000); // 30 seconds
-
-        // Close the browser
-        await browser.close();
-
-        res.json({ result, consoleLogs });
+        // Execute and await the result, passing puppeteer as an argument
+        const result = await asyncFunction(puppeteer);
+        
+        res.json({ result });
     } catch (error) {
-        // Close the browser in case of error
-        await browser.close();
-        res.status(500).json({ error: error.message, trace: error.stack, consoleLogs });
+        res.status(500).json({ error: error.message, trace: error.stack });
     }
 });
 
